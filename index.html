@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Smart Home Dashboard</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase SDK v9 Compat Mode -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #1565C0;
+            --primary-hover: #1976D2;
+            --primary-light: #42A5F5;
+            --bg: #F0F2F5;
+            --card-bg: #FFFFFF;
+            --text: #333333;
+            --text-muted: #666666;
+            --border: #E0E0E0;
+            --green: #4CAF50;
+            --red: #F44336;
+        }
+
+        [data-theme="dark"] {
+            --primary: #42A5F5;
+            --primary-hover: #1976D2;
+            --bg: #0D1117;
+            --card-bg: #161B22;
+            --text: #F0F6FC;
+            --text-muted: #8B949E;
+            --border: #30363D;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Container & Grid */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+        
+        @media (min-width: 768px) {
+            .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* Card */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        
+        .card h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--primary);
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--red); }
+        .btn-danger:hover { background: #D32F2F; }
+
+        /* Authentication View */
+        #authView {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .login-box {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-box h2 { margin-top: 0; margin-bottom: 5px; }
+        .login-box p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+        .input-group {
+            text-align: left;
+            margin-bottom: 16px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+        .error-msg {
+            color: var(--red);
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: none;
+            background: rgba(244, 67, 54, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        /* Dashboard Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header p { margin: 0; font-size: 14px; color: var(--text-muted); }
+        .header-actions { display: flex; align-items: center; gap: 20px; }
+
+        /* Theme Toggle */
+        .theme-switch-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        /* Toggle Switch (Checkbox) */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        /* Sensor Boxes */
+        .sensor-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .sensor-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: 0.3s;
+        }
+        .sensor-val {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+        .sensor-label { font-size: 13px; color: var(--text-muted); }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            background: var(--bg);
+            border: 1px solid var(--border);
+        }
+        .status-badge.online {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--green);
+            border-color: rgba(76, 175, 80, 0.2);
+        }
+
+        /* Relay Items */
+        .relay-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .relay-label { display: flex; align-items: center; font-weight: 500; }
+        .indicator {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background-color: #9e9e9e;
+            margin-right: 12px;
+            transition: 0.3s;
+        }
+        .indicator.on {
+            background-color: var(--green);
+            box-shadow: 0 0 8px var(--green);
+        }
+
+        /* Select box */
+        select {
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            outline: none;
+            font-size: 15px;
+        }
+
+        /* Voice Control */
+        .voice-box { text-align: center; }
+        #micBtn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: none;
+            background: var(--text-muted);
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            margin: 20px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        #micBtn:hover { transform: scale(1.05); }
+        #micBtn.active {
+            background: var(--red);
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.5); }
+            70% { box-shadow: 0 0 0 15px rgba(244, 67, 54, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+        }
+        #transcriptText {
+            margin-top: 15px;
+            font-style: italic;
+            color: var(--text-muted);
+            min-height: 24px;
+            font-size: 14px;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- ======== VIEW: LOGIN ======== -->
+    <div id="authView">
+        <div class="card login-box">
+            <h2>🔑 Smart Home</h2>
+            <p>Silakan login untuk mengakses perangkat</p>
+            
+            <div id="authError" class="error-msg">Email atau password salah.</div>
+            
+            <form id="loginForm">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" required placeholder="email@contoh.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn" style="width: 100%; margin-top: 10px;" id="loginBtn">Masuk Web</button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ======== VIEW: DASHBOARD ======== -->
+    <div id="dashboardView" class="container hidden">
+        
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>🏠 Dashboard ESP32</h1>
+                <p>Real-time Monitoring & Control</p>
+            </div>
+            <div class="header-actions">
+                <div class="theme-switch-wrapper">
+                    <span style="font-size:18px;">☀️</span>
+                    <label class="switch">
+                        <input type="checkbox" id="themeToggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:18px;">🌙</span>
+                </div>
+                <button class="btn btn-danger" id="logoutBtn">Logout</button>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <!-- Sensor Monitoring -->
+            <div class="card">
+                <h3>📊 Monitoring Sensor</h3>
+                <div class="sensor-container">
+                    <div class="sensor-box">
+                        <div style="font-size: 28px;">🌡️</div>
+                        <div class="sensor-val" id="valTemp">--</div>
+                        <div class="sensor-label">Suhu (°C)</div>
+                    </div>
+                    <div class="sensor-box">
+                        <div style="font-size: 28px;">💧</div>
+                        <div class="sensor-val" id="valHum">--</div>
+                        <div class="sensor-label">Kelembaban (%)</div>
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    Status ESP32: 
+                    <div class="status-badge" id="valOnline">
+                        <span class="indicator" style="margin: 0 6px 0 0;"></span> Offline
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Control -->
+            <div class="card voice-box">
+                <h3>🎙️ Kontrol Suara</h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                    Contoh: "Lampu satu nyala", "Lampu dua mati", "Semua nyala", "Mode dua"
+                </p>
+                <button id="micBtn" title="Tekan untuk bicara">🎤</button>
+                <div id="transcriptText">Tekan mikrofon untuk mulai bicara...</div>
+            </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top: 20px;">
+            <!-- Control Relay -->
+            <div class="card">
+                <h3>⚡ Kontrol Relay</h3>
+                <div>
+                    <!-- Relay 1 -->
+                    <div class="relay-item">
+                        <div class="relay-label">
+                            <span class="indicator" id="ind-1"></span> Relay 1
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="chk-1" onchange="setRelay('relay1', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <!-- Relay 2 -->
+                    <div class="relay-item">
+                        <div class="relay-label">
+                            <span class="indicator" id="ind-2"></span> Relay 2
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="chk-2" onchange="setRelay('relay2', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <!-- Relay 3 -->
+                    <div class="relay-item">
+                        <div class="relay-label">
+                            <span class="indicator" id="ind-3"></span> Relay 3
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="chk-3" onchange="setRelay('relay3', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <!-- Relay 4 -->
+                    <div class="relay-item">
+                        <div class="relay-label">
+                            <span class="indicator" id="ind-4"></span> Relay 4
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="chk-4" onchange="setRelay('relay4', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode Selector -->
+            <div class="card">
+                <h3>✨ Mode Animasi</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom: 16px;">
+                    Ubah perilaku lampu pada ESP32
+                </p>
+                <select id="modeSelect" onchange="setAnimasi(this.value)">
+                    <option value="0">0 - Manual Mode</option>
+                    <option value="1">1 - Running Light</option>
+                    <option value="2">2 - Blink All</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Realtime Chart -->
+        <div class="card" style="margin-top: 20px;">
+            <h3>📈 Grafik Sensor Realtime</h3>
+            <div style="position: relative; height: 350px; width: 100%;">
+                <canvas id="sensorChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ======== JAVASCRIPT LOGIC ======== -->
+    <script>
+        // --- 1. FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCQdXGar5NCtExlMH8iJ7X2-BzhaJKRMeU",
+            authDomain: "memey-iot-firebase.firebaseapp.com",
+            databaseURL: "https://memey-iot-firebase-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "memey-iot-firebase"
+        };
+
+        // Inisialisasi Firebase Compat
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+        const ESP32_PATH = "devices/esp32_01";
+
+        // --- 2. DOM ELEMENTS ---
+        const authView = document.getElementById('authView');
+        const dashboardView = document.getElementById('dashboardView');
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const authError = document.getElementById('authError');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const themeToggle = document.getElementById('themeToggle');
+
+        // --- 3. AUTHENTICATION ---
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                authView.classList.add('hidden');
+                dashboardView.classList.remove('hidden');
+                initDashboard();
+            } else {
+                authView.classList.remove('hidden');
+                dashboardView.classList.add('hidden');
+                cleanupDashboard();
+            }
+        });
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            loginBtn.innerText = "Memproses...";
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => {
+                    authError.style.display = 'none';
+                    loginBtn.innerText = "Masuk Web";
+                    loginForm.reset();
+                })
+                .catch((error) => {
+                    authError.style.display = 'block';
+                    authError.innerText = "Gagal login. Email atau password salah!";
+                    loginBtn.innerText = "Masuk Web";
+                });
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            if(confirm("Yakin ingin logout?")) {
+                auth.signOut();
+            }
+        });
+
+        // --- 4. DASHBOARD LOGIC ---
+        let sensorChart;
+        let isDashboardInit = false;
+
+        function initDashboard() {
+            if(isDashboardInit) return;
+            setupChart();
+            startFirebaseListeners();
+            setupVoiceControl();
+            isDashboardInit = true;
+        }
+
+        function cleanupDashboard() {
+            db.ref(ESP32_PATH).off(); // Remove listeners
+            isDashboardInit = false;
+        }
+
+        function startFirebaseListeners() {
+            // -- Listener: Online Status --
+            db.ref(`${ESP32_PATH}/status/online`).on('value', (snap) => {
+                const online = snap.val();
+                const badge = document.getElementById('valOnline');
+                if(online) {
+                    badge.classList.add('online');
+                    badge.innerHTML = `<span class="indicator on" style="margin: 0 6px 0 0;"></span> Online`;
+                } else {
+                    badge.classList.remove('online');
+                    badge.innerHTML = `<span class="indicator" style="margin: 0 6px 0 0;"></span> Offline`;
+                }
+            });
+
+            // -- Listener: Mode Animasi --
+            db.ref(`${ESP32_PATH}/mode/animasi`).on('value', (snap) => {
+                document.getElementById('modeSelect').value = snap.val() || 0;
+            });
+
+            // -- Listener: Relay 1 to 4 --
+            for(let i=1; i<=4; i++) {
+                db.ref(`${ESP32_PATH}/control/relay${i}`).on('value', (snap) => {
+                    const isON = snap.val() || false;
+                    document.getElementById(`chk-${i}`).checked = isON;
+                    const ind = document.getElementById(`ind-${i}`);
+                    if(isON) ind.classList.add('on');
+                    else ind.classList.remove('on');
+                });
+            }
+
+            // -- Listener: Sensors --
+            db.ref(`${ESP32_PATH}/sensor`).on('value', (snap) => {
+                const data = snap.val();
+                if(data) {
+                    const temp = data.temperature || 0;
+                    const hum = data.humidity || 0;
+                    
+                    document.getElementById('valTemp').innerText = temp.toFixed(1);
+                    document.getElementById('valHum').innerText = hum.toFixed(1);
+                    
+                    updateChartData(temp, hum);
+                }
+            });
+        }
+
+        // --- 5. FIREBASE WRITERS ---
+        window.setRelay = function(relayName, state) {
+            db.ref(`${ESP32_PATH}/control/${relayName}`).set(state);
+        }
+
+        window.setAnimasi = function(val) {
+            db.ref(`${ESP32_PATH}/mode/animasi`).set(parseInt(val));
+        }
+
+        // --- 6. CHART.JS SETUP ---
+        function setupChart() {
+            const ctx = document.getElementById('sensorChart').getContext('2d');
+            sensorChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Suhu (°C)',
+                            data: [],
+                            borderColor: '#1976D2',
+                            backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'Kelembaban (%)',
+                            data: [],
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100, // Karena kelembaban max 100
+                            grid: { color: 'rgba(128, 128, 128, 0.2)' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(128, 128, 128, 0.2)' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: document.documentElement.getAttribute('data-theme') === 'dark' ? '#F0F6FC' : '#333'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        let lastGraphUpdate = 0;
+        function updateChartData(temp, hum) {
+            // Batasi update grafik agar tidak numpuk berlebihan (minimal 1 detik sekali saat ada data trigger)
+            const now = Date.now();
+            if(now - lastGraphUpdate < 1000) return;
+            lastGraphUpdate = now;
+
+            const timeNow = new Date();
+            const tStr = `${timeNow.getHours().toString().padStart(2,'0')}:${timeNow.getMinutes().toString().padStart(2,'0')}:${timeNow.getSeconds().toString().padStart(2,'0')}`;
+            
+            sensorChart.data.labels.push(tStr);
+            sensorChart.data.datasets[0].data.push(temp);
+            sensorChart.data.datasets[1].data.push(hum);
+
+            // Tampilkan 20 data terakhir
+            if(sensorChart.data.labels.length > 20) {
+                sensorChart.data.labels.shift();
+                sensorChart.data.datasets[0].data.shift();
+                sensorChart.data.datasets[1].data.shift();
+            }
+            sensorChart.update();
+        }
+
+        // --- 7. THEME TOGGLE ---
+        themeToggle.addEventListener('change', (e) => {
+            const isDark = e.target.checked;
+            if(isDark) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            
+            // Adjust Chart Colors
+            if(sensorChart) {
+                sensorChart.options.plugins.legend.labels.color = isDark ? '#F0F6FC' : '#333';
+                sensorChart.options.scales.x.ticks.color = isDark ? '#8B949E' : '#666';
+                sensorChart.options.scales.y.ticks.color = isDark ? '#8B949E' : '#666';
+                sensorChart.update();
+            }
+        });
+
+        // --- 8. VOICE CONTROL (WEB SPEECH API) ---
+        function setupVoiceControl() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const transcriptText = document.getElementById('transcriptText');
+            const micBtn = document.getElementById('micBtn');
+
+            if(!SpeechRecognition) {
+                transcriptText.innerText = "Browser Anda tidak mendukung Voice Control (Gunakan Chrome).";
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'id-ID';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            let isRecording = false;
+
+            micBtn.addEventListener('click', () => {
+                if(isRecording) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
+
+            recognition.onstart = () => {
+                isRecording = true;
+                micBtn.classList.add('active');
+                transcriptText.innerText = "Mendengarkan...";
+            };
+
+            recognition.onresult = (event) => {
+                const text = event.results[event.resultIndex][0].transcript.toLowerCase();
+                transcriptText.innerText = `Terdeteksi: "${text}"`;
+                handleVoiceCommand(text);
+            };
+
+            recognition.onspeechend = () => {
+                recognition.stop();
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                micBtn.classList.remove('active');
+                if(transcriptText.innerText === "Mendengarkan...") {
+                    transcriptText.innerText = "Suara tidak terdeteksi.";
+                }
+            };
+
+            recognition.onerror = (event) => {
+                isRecording = false;
+                micBtn.classList.remove('active');
+                transcriptText.innerText = `Error: ${event.error}`;
+            };
+        }
+
+        function handleVoiceCommand(text) {
+            // -- INDIVIDUAL ON --
+            if(text.includes('lampu satu nyala') || text.includes('lampu 1 nyala')) setRelay('relay1', true);
+            else if(text.includes('lampu dua nyala') || text.includes('lampu 2 nyala')) setRelay('relay2', true);
+            else if(text.includes('lampu tiga nyala') || text.includes('lampu 3 nyala')) setRelay('relay3', true);
+            else if(text.includes('lampu empat nyala') || text.includes('lampu 4 nyala')) setRelay('relay4', true);
+            
+            // -- INDIVIDUAL OFF --
+            else if(text.includes('lampu satu mati') || text.includes('lampu 1 mati')) setRelay('relay1', false);
+            else if(text.includes('lampu dua mati') || text.includes('lampu 2 mati')) setRelay('relay2', false);
+            else if(text.includes('lampu tiga mati') || text.includes('lampu 3 mati')) setRelay('relay3', false);
+            else if(text.includes('lampu empat mati') || text.includes('lampu 4 mati')) setRelay('relay4', false);
+            
+            // -- MASTER ALL --
+            else if(text.includes('semua nyala') || text.includes('hidupkan semua')) {
+                setRelay('relay1', true); setRelay('relay2', true); 
+                setRelay('relay3', true); setRelay('relay4', true);
+            }
+            else if(text.includes('semua mati') || text.includes('matikan semua')) {
+                setRelay('relay1', false); setRelay('relay2', false); 
+                setRelay('relay3', false); setRelay('relay4', false);
+            }
+            
+            // -- MODES --
+            else if(text.includes('mode manual')) setAnimasi(0);
+            else if(text.includes('mode satu') || text.includes('mode 1')) setAnimasi(1);
+            else if(text.includes('mode dua') || text.includes('mode 2')) setAnimasi(2);
+            
+            else {
+                document.getElementById('transcriptText').innerText += " (Perintah tidak valid)";
+            }
+        }
+    </script>
+</body>
+</html>
